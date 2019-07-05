@@ -1,6 +1,8 @@
 package com.my.project;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -10,12 +12,19 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.net.ftp.FTPFile;
+import org.apache.log4j.AppenderSkeleton;
+import org.apache.log4j.Layout;
+import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggingEvent;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+
+import com.jcraft.jsch.ChannelSftp.LsEntry;
 
 public abstract class BaseTest<S, C extends RemoteClient<?>> {
 
@@ -25,6 +34,8 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 	public static final String PASSWORD = "password";
 	/** FTP/SFTP主机名 */
 	public static final String HOSTNAME = "localhost";
+
+	private TestAppender loggerAppender = new TestAppender();
 
 	/** Exception */
 	@Rule public final ExpectedException exception = ExpectedException.none();
@@ -40,11 +51,36 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 	public C client = null;
 
 	@Before
+	public void before() throws IOException {
+		Logger.getRootLogger().addAppender(loggerAppender);
+		this.startServer();
+	}
+
 	public abstract void startServer() throws IOException;
 
 	@After
+	public void after() throws IOException {
+		this.stopServer();
+		Logger.getRootLogger().removeAppender(loggerAppender);
+		loggerAppender.clear();
+	}
+
 	public abstract void stopServer() throws IOException;
 
+	@Test
+	public void testLsNull() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_EMPTY_MESSAGE);
+		client.ls(null);
+		client.ls("");
+		client.ls("  ");
+		client.ls(null, true);
+		client.ls("", true);
+		client.ls("  ", true);
+		client.ls(null, false);
+		client.ls("", false);
+		client.ls("  ", false);
+	}
 
 	@Test
 	public void testLs() throws IOException {
@@ -53,26 +89,51 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 		client.mkdir("/new");
 		assertEquals(1, client.ls("/hello.txt").size());
 		assertEquals(0, client.ls("/new").size());
+		assertEquals(2, client.ls("/").size());
 		assertEquals(0, client.ls(".hidden.txt", true).size());
 		assertEquals(1, client.ls(".hidden.txt", false).size());
+		assertEquals(3, client.ls("/", false).size());
 		if(client instanceof SftpClient) {
 			exception.expect(IOException.class);
 			exception.expectMessage("No such file or directory");
 		}
 		int notExistsFolder = client.ls("/a").size();
 		int notExistsFile = client.ls("/a/b.txt").size();
-		if(client instanceof FtpClient) {			
+		if(client instanceof FtpClient) {
 			assertEquals(0, notExistsFolder);
 			assertEquals(0, notExistsFile);
 		}
 	}
 
 	@Test
+	public void testMkdirNull() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_EMPTY_MESSAGE);
+		client.mkdir(null);
+		client.mkdir("");
+		client.mkdir("  ");
+		client.mkdirRecursive(null);
+		client.mkdirRecursive("");
+		client.mkdirRecursive("  ");
+	}
+
+	@Test
 	public void testMkdir() throws IOException {
+		remote("hello.txt", "Hello World");
+		client.mkdir("hello.txt");
+		assertTrue(loggerAppender.contains("hello.txt already exists"));
+
 		client.mkdir("/new");
 		client.mkdirRecursive("/a/b/c");
 		assertTrue(remoteGet("/new").isDirectory());
 		assertTrue(remoteGet("/a/b/c").isDirectory());
+
+		client.mkdirRecursive("/a/b/c");
+		assertTrue(loggerAppender.contains("/a/b/c already exists"));
+
+		client.mkdir("/");
+		client.mkdirRecursive("/");
+		assertTrue(loggerAppender.contains("/ already exists"));
 	}
 	
 	@Test
@@ -89,6 +150,87 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 		client.put(local, "/new/");
 		assertTrue(remoteGet("/new/newfile.txt").isFile());
 		assertEquals("Hello New File", content(remoteGet("/new/newfile.txt")));
+	}
+
+	@Test
+	public void testRm() throws IOException {
+		remote("hello.txt", "Hello World");
+		remoteFolder("a", "b", "c");
+		client.rm("/hello.txt");
+		client.rmdir("/a/b/c");
+		assertFalse(client.exists("/hello.txt"));
+		assertFalse(client.exists("/a/b/c"));
+	}
+
+	@Test
+	public void testRmRecursiveNull() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_EMPTY_MESSAGE);
+		client.rmRecursive(null);
+		client.rmRecursive("");
+		client.rmRecursive("  ");
+	}
+
+	@Test
+	public void testRmRecursive() throws IOException {
+		remote("hello.txt", "Hello World");
+		remoteFolder("a", "b", "c");
+		remote("/a/b/c/newfile.txt", "Hello New File");
+
+		client.rmRecursive("/hello.txt");
+		assertNull(client.stat("/hello.txt"));
+		client.rmRecursive("/a");
+		assertNull(client.stat("/a"));
+
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
+		client.rm("/");
+
+		client.rm("/hello.txt");
+		assertTrue(loggerAppender.contains("hello.txt already exists"));
+	}
+
+	@Test
+	public void testStat() throws IOException {
+		remote("hello.txt", "Hello World");
+		remoteFolder("a", "b", "c");
+		if(client instanceof SftpClient) {
+			LsEntry f = null;
+			f = (LsEntry) client.stat("/hello.txt");
+			assertFalse(f.getAttrs().isDir());
+			assertEquals("hello.txt", f.getFilename());
+			f = (LsEntry) client.stat("/a/b/c");
+			assertTrue(f.getAttrs().isDir());
+			assertEquals("c", f.getFilename());
+			f = (LsEntry) client.stat("/no.txt");
+			assertNull(f);
+			f = (LsEntry) client.stat("/d/e/f");
+			assertNull(f);
+		}
+
+		if(client instanceof FtpClient) {
+			FTPFile f = null;
+			f = (FTPFile) client.stat("/hello.txt");
+			assertFalse(f.isDirectory());
+			assertEquals("hello.txt", f.getName());
+			f = (FTPFile) client.stat("/a/b/c");
+			assertTrue(f.isDirectory());
+			assertEquals("c", f.getName());
+			f = (FTPFile) client.stat("/no.txt");
+			assertNull(f);
+			f = (FTPFile) client.stat("/d/e/f");
+			assertNull(f);
+		}
+	}
+
+	@Test
+	public void testExists() throws IOException {
+		remote("hello.txt", "Hello World");
+		remoteFolder("a", "b", "c");
+		assertTrue(client.exists("/hello.txt"));
+		assertTrue(client.exists("/a/b/c"));
+		assertFalse(client.exists("/no.txt"));
+		assertFalse(client.exists("/d/e/f"));
 	}
 
 	/**
@@ -118,7 +260,16 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 	protected File local(String fileName) throws IOException {
 		return newFile(userRoot, fileName);
 	}
-	
+
+	/**
+	 * 创建本地测试目录
+	 * @param folders 目录名
+	 * @return 目录
+	 */
+	protected File localFolder(String... folders) throws IOException {
+		return newFolder(userRoot, folders);
+	}
+
 	/**
 	 * 创建一个本地测试文件（文件名随机）
 	 * @param content 文件内容
@@ -209,6 +360,15 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 	}
 	
 	/**
+	 * 创建远程测试目录
+	 * @param folders 目录名
+	 * @return 目录
+	 */
+	protected File remoteFolder(String... folders) throws IOException {
+		return newFolder(serverRoot, folders);
+	}
+
+	/**
 	 * 创建一个远程测试文件（文件名随机）
 	 * @param content 文件内容
 	 * @return 测试文件
@@ -278,22 +438,16 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 		return new File(serverRoot.getRoot(), path);
 	}
 
+	private File newFolder(TemporaryFolder root, String... folders) throws IOException {
+		return root.newFolder(folders);
+	}
+
 	private File newFile(TemporaryFolder root, String fileName) throws IOException {
-		return this.newFile(root, null, fileName, null);
+		return this.newFile(root, fileName, null);
 	}
 
 	private File newFile(TemporaryFolder root, String fileName, String content) throws IOException {
-		return this.newFile(root, null, fileName, content);
-	}
-
-	private File newFile(TemporaryFolder root, String folder, String fileName, String content) throws IOException {
-		String path = "";
-		if(folder != null) {
-			root.newFolder(folder);
-			path = folder + File.separator;
-		}
-
-		File newFile = root.newFile(path + fileName);
+		File newFile = root.newFile(fileName);
 
 		if(content != null) {
 			Files.write(newFile.toPath(), content.getBytes(), StandardOpenOption.WRITE);
@@ -361,5 +515,36 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 
 		return list;
 	}
-	
+
+	private static class TestAppender extends AppenderSkeleton {
+
+		private List<String> logs = new ArrayList<String>();
+
+		@Override
+		public boolean requiresLayout() { return false; }
+		@Override
+		public void close() { }
+		@Override
+		protected void append(LoggingEvent event) {
+			StringBuffer buffer = new StringBuffer(128);
+			buffer.append(event.getRenderedMessage()).append(Layout.LINE_SEP);
+			String[] s = event.getThrowableStrRep();
+			if (s != null) {
+				int len = s.length;
+				for (int i = 0; i < len; ++i) {
+					buffer.append(s[i]).append(Layout.LINE_SEP);
+				}
+			}
+			logs.add(buffer.toString().trim());
+		}
+
+		public boolean contains(String log) {
+			return logs.contains(log);
+		}
+
+		public void clear() {
+			logs.clear();
+		}
+
+	}
 }

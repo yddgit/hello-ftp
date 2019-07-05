@@ -15,6 +15,7 @@ import org.apache.ftpserver.ftplet.User;
 import org.apache.ftpserver.ftplet.UserManager;
 import org.apache.ftpserver.listener.Listener;
 import org.apache.ftpserver.listener.ListenerFactory;
+import org.apache.ftpserver.message.MessageResourceFactory;
 import org.apache.ftpserver.usermanager.AnonymousAuthentication;
 import org.apache.ftpserver.usermanager.UsernamePasswordAuthentication;
 import org.apache.ftpserver.usermanager.impl.BaseUser;
@@ -33,6 +34,9 @@ public class FtpTest extends BaseTest<FtpServer, FtpClient> {
 		Listener listener = factory.createListener();
 		serverFactory.addListener("default", listener);
 		serverFactory.setUserManager(new InnerUserManager(USERNAME, PASSWORD, serverRoot.getRoot()));
+		MessageResourceFactory messageFactory = new MessageResourceFactory();
+		messageFactory.setCustomMessageDirectory(new File(FtpTest.class.getResource("/").getFile()));
+		serverFactory.setMessageResource(messageFactory.createMessageResource());
 		this.server = serverFactory.createServer();
 		try {
 			this.server.start();
