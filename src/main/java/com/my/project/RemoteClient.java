@@ -18,7 +18,10 @@ public interface RemoteClient<T> extends Closeable {
 	 * @param remotePath 远程目录
 	 * @return 文件列表
 	 */
-	List<T> ls(String remotePath) throws IOException;
+	default List<T> ls(String remotePath) throws IOException {
+		assertNotBlank(remotePath, "remote path can not be null or blank");
+		return this.ls(remotePath, true);
+	}
 
 	/**
 	 * 列出指定目录下的文件
@@ -33,14 +36,18 @@ public interface RemoteClient<T> extends Closeable {
 	 * @param remotePath 远程目录
 	 */
 	default void mkdirRecursive(String remotePath) throws IOException {
+		assertNotBlank(remotePath, "remote path can not be null or blank");
 		if(StringUtils.isNotBlank(remotePath)) {
-			String root = "";
+			String prefix = "";
 			if(remotePath.startsWith("/")) {
-				root = "/";
+				prefix = "/";
 				remotePath = remotePath.substring(1);
 			}
+			if(remotePath.endsWith("/")) {
+				remotePath.substring(0, remotePath.length() - 1);
+			}
 			String[] folders = remotePath.split("/");
-			folders[0] = root + folders[0];
+			folders[0] = prefix + folders[0];
 			// first folder
 			StringBuffer path = new StringBuffer(folders[0]);
 			this.mkdir(path.toString());
@@ -93,5 +100,39 @@ public interface RemoteClient<T> extends Closeable {
 	 * @param remotePath 远程目录或文件
 	 * @return 存在返回true，否则返回false
 	 */
-	boolean exists(String remotePath) throws IOException;
+	boolean exists(String remotePath);
+
+	/**
+	 * 检查指定对象不能为空
+	 * @param object 要检查的对象
+	 * @param message 异常message
+	 */
+	public static void assertNotNull(Object object, String message) {
+		if (object == null) {
+			throw new IllegalArgumentException(message);
+		}
+	}
+
+	/**
+	 * 检查指定字符串不能为空白字符串
+	 * @param s 要检查的字符串
+	 * @param message 异常message
+	 */
+	public static void assertNotBlank(String s, String message) {
+		if (StringUtils.isBlank(s)) {
+			throw new IllegalArgumentException(message);
+		}
+	}
+
+	/**
+	 * 检查指定表达式为true
+	 * @param expression 表达式
+	 * @param message 表达式为false时的异常message
+	 */
+	public static void assertIsTrue(boolean expression, String message) {
+		if (!expression) {
+			throw new IllegalArgumentException(message);
+		}
+	}
+
 }

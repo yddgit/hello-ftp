@@ -20,6 +20,8 @@ import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
 import com.jcraft.jsch.UserInfo;
 
+import static com.my.project.RemoteClient.*;
+
 public class SftpClient implements RemoteClient<LsEntry> {
 
 	private Session session;
@@ -41,12 +43,8 @@ public class SftpClient implements RemoteClient<LsEntry> {
 	}
 
 	@Override
-	public List<LsEntry> ls(String remotePath) {
-		return this.ls(remotePath, true);
-	}
-
-	@Override
-	public List<LsEntry> ls(String remotePath, boolean filterHiddenFile) {
+	public List<LsEntry> ls(String remotePath, boolean filterHiddenFile) throws IOException {
+		assertNotBlank(remotePath, "remote path can not be null or blank");
 		List<LsEntry> list = new ArrayList<LsEntry>();
 		LsEntrySelector selector = (entry) -> {
 			String name = entry.getFilename();
@@ -62,35 +60,48 @@ public class SftpClient implements RemoteClient<LsEntry> {
 		try {
 			channel.ls(remotePath, selector);
 		} catch (SftpException e) {
-			logger.warn(e.getMessage());
+			throw new IOException(e);
 		}
 		return list;
 	}
 
 	@Override
 	public void mkdir(String remotePath) throws IOException {
+		assertNotBlank(remotePath, "remote path can not be null or blank");
 		if(!this.exists(remotePath)) {
 			try {
 				channel.mkdir(remotePath);
 			} catch (SftpException e) {
 				throw new IOException(e);
 			}
+		} else {
+			logger.warn("{} already exists", remotePath);
 		}
 	}
 
 	@Override
 	public void get(String remotePath, File local) throws IOException {
-		try (OutputStream output = new FileOutputStream(local)) {			
-			channel.get(remotePath, output);
-		} catch (SftpException e) {
-			throw new IOException(e);
+		assertNotBlank(remotePath, "remote path can not be null or blank");
+		if(this.exists(remotePath)) {
+			try (OutputStream output = new FileOutputStream(local)) {			
+				channel.get(remotePath, output);
+			} catch (SftpException e) {
+				throw new IOException(e);
+			}
+		} else {
+			logger.warn("{} does not exists", remotePath);
 		}
 	}
 
 	@Override
 	public void put(File local, String remotePath) throws IOException {
-		try (InputStream input = new FileInputStream(local)) {
+		assertNotBlank(remotePath, "remote path can not be null or blank");
+		if(!this.exists(remotePath)) {
 			this.mkdirRecursive(remotePath);
+		}
+		assertNotNull(local, "local file can not be null");
+		assertIsTrue(local.exists(), "local file must be exists");
+		try (InputStream input = new FileInputStream(local)) {
 			channel.put(input, remotePath + (remotePath.endsWith("/") ? "" : "/") + local.getName(), ChannelSftp.OVERWRITE);
 		} catch (SftpException e) {
 			throw new IOException(e);
@@ -99,19 +110,29 @@ public class SftpClient implements RemoteClient<LsEntry> {
 
 	@Override
 	public void rm(String remotePath) throws IOException {
-		try {
-			channel.rm(remotePath);
-		} catch (SftpException e) {
-			throw new IOException(e);
+		assertNotBlank(remotePath, "remote path can not be null or blank");
+		if(this.exists(remotePath)) {
+			try {
+				channel.rm(remotePath);
+			} catch (SftpException e) {
+				throw new IOException(e);
+			}
+		} else {
+			logger.warn("{} does not exists", remotePath);
 		}
 	}
 	
 	@Override
 	public void rmdir(String remotePath) throws IOException {
-		try {
-			channel.rmdir(remotePath);
-		} catch (SftpException e) {
-			throw new IOException(e);
+		assertNotBlank(remotePath, "remote path can not be null or blank");
+		if(this.exists(remotePath)) {
+			try {
+				channel.rmdir(remotePath);
+			} catch (SftpException e) {
+				throw new IOException(e);
+			}
+		} else {
+			logger.warn("{} does not exists", remotePath);
 		}
 	}
 	

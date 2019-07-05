@@ -22,8 +22,6 @@ import org.apache.ftpserver.usermanager.impl.ConcurrentLoginPermission;
 import org.apache.ftpserver.usermanager.impl.TransferRatePermission;
 import org.apache.ftpserver.usermanager.impl.WritePermission;
 
-import com.my.project.FtpClient;
-
 public class FtpTest extends BaseTest<FtpServer, FtpClient> {
 
 	@Override
@@ -34,7 +32,7 @@ public class FtpTest extends BaseTest<FtpServer, FtpClient> {
 		factory.setPort(0);
 		Listener listener = factory.createListener();
 		serverFactory.addListener("default", listener);
-		serverFactory.setUserManager(new MyUserManager(USERNAME, PASSWORD, serverRoot.getRoot()));
+		serverFactory.setUserManager(new InnerUserManager(USERNAME, PASSWORD, serverRoot.getRoot()));
 		this.server = serverFactory.createServer();
 		try {
 			this.server.start();
@@ -57,11 +55,11 @@ public class FtpTest extends BaseTest<FtpServer, FtpClient> {
 		}
 	}
 
-	private static class MyUserManager implements UserManager {
+	private static class InnerUserManager implements UserManager {
 
 		private final User user;
 
-		public MyUserManager(String username, String password, File home) {
+		public InnerUserManager(String username, String password, File home) {
 			BaseUser u = new BaseUser();
 	        u.setName(username);
 	        u.setPassword(password);

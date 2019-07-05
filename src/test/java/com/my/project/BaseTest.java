@@ -14,6 +14,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
 public abstract class BaseTest<S, C extends RemoteClient<?>> {
@@ -25,10 +26,12 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 	/** FTP/SFTP主机名 */
 	public static final String HOSTNAME = "localhost";
 
+	/** Exception */
+	@Rule public final ExpectedException exception = ExpectedException.none();
 	/** 本地根目录 */
-	@Rule public TemporaryFolder userRoot = new TemporaryFolder();
+	@Rule public final TemporaryFolder userRoot = new TemporaryFolder();
 	/** FTP/SFTP根目录 */
-	@Rule public TemporaryFolder serverRoot = new TemporaryFolder();
+	@Rule public final TemporaryFolder serverRoot = new TemporaryFolder();
 	/** FTP/SFTP服务监听端口 */
 	public Integer localPort = -1;
 	/** FTP/SFTP服务端 */
@@ -48,12 +51,20 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 		remote("hello.txt", "Hello World");
 		remote(".hidden.txt", "Hidden File");
 		client.mkdir("/new");
-		assertEquals(0, client.ls("/a").size());
-		assertEquals(0, client.ls("/a/b.txt").size());
 		assertEquals(1, client.ls("/hello.txt").size());
 		assertEquals(0, client.ls("/new").size());
 		assertEquals(0, client.ls(".hidden.txt", true).size());
 		assertEquals(1, client.ls(".hidden.txt", false).size());
+		if(client instanceof SftpClient) {
+			exception.expect(IOException.class);
+			exception.expectMessage("No such file or directory");
+		}
+		int notExistsFolder = client.ls("/a").size();
+		int notExistsFile = client.ls("/a/b.txt").size();
+		if(client instanceof FtpClient) {			
+			assertEquals(0, notExistsFolder);
+			assertEquals(0, notExistsFile);
+		}
 	}
 
 	@Test
@@ -62,6 +73,14 @@ public abstract class BaseTest<S, C extends RemoteClient<?>> {
 		client.mkdirRecursive("/a/b/c");
 		assertTrue(remoteGet("/new").isDirectory());
 		assertTrue(remoteGet("/a/b/c").isDirectory());
+	}
+	
+	@Test
+	public void testGet() throws IOException {
+		remote("hello.txt", "Hello World");
+		client.get("/hello.txt", localGet("hello.txt"));
+		assertTrue(localGet("/hello.txt").isFile());
+		assertEquals("Hello World", content(localGet("/hello.txt")));
 	}
 
 	@Test
