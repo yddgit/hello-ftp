@@ -326,6 +326,12 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 	}
 
 	@Test
+	public void testMgetRemoteNotExists() throws IOException {
+		client.mget("/a/b/c", localFolder("download"));
+		assertTrue(loggerAppender.contains("/a/b/c does not exists"));
+	}
+	
+	@Test
 	public void testMget() throws IOException {
 		remoteFolder("new", "a", "b", "c");
 		remote("/new/a/a.txt", "This is a file");
@@ -677,6 +683,21 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 		assertNull(client.stat(null));
 		assertNull(client.stat(""));
 		assertNull(client.stat("  "));
+	}
+
+	@Test
+	public void testStatNotExists() {
+		assertNull(client.stat("/no.txt"));
+	}
+
+	@Test
+	public void testIsDirNull() {
+		assertFalse(client.isDir(null));
+	}
+
+	@Test
+	public void testGetFileNameNull() {
+		assertNull(client.getFileName(null));
 	}
 
 	/**
