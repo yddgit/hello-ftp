@@ -31,10 +31,11 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 	/** 连接超时时间(milliseconds) */
 	public static final int TIMEOUT = 60 * 1000;
 
-	private final TestAppender loggerAppender = new TestAppender();
-
+	/** Log Appender */
+	public final TestAppender loggerAppender = new TestAppender();
 	/** Exception */
 	@Rule public final ExpectedException exception = ExpectedException.none();
+
 	/** FTP/SFTP服务监听端口 */
 	public Integer localPort = -1;
 	/** FTP/SFTP服务端 */
@@ -242,7 +243,7 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 	public void testGetRemotePathIsDir() throws IOException {
 		remoteFolder("a", "b", "c");
 		exception.expect(IllegalArgumentException.class);
-		exception.expectMessage(RemoteClient.REMOTE_PATH_MUST_BE_A_FILE);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_FILE, "/a/b/c"));
 		client.get("/a/b/c", localGet("c"));
 	}
 
@@ -256,6 +257,104 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 
 		client.get("/no.txt", localGet("no.txt"));
 		assertTrue(loggerAppender.contains("/no.txt does not exists"));
+	}
+
+	@Test
+	public void testMgetNull() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		client.mget(null, null);
+	}
+
+	@Test
+	public void testMgetEmpty() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		client.mget("", null);
+	}
+	
+	@Test
+	public void testMgetBlank() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		client.mget("  ", null);
+	}
+	
+	@Test
+	public void testMgetLocalNull() throws IOException {
+		remoteFolder("new");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.LOCAL_PATH_CAN_NOT_BE_NULL);
+		client.mget("/new", null);
+	}
+	
+	@Test
+	public void testMgetLocalIsFile() throws IOException {
+		remoteFolder("new");
+		File local = local("hello.txt", "Hello World");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.LOCAL_PATH_MUST_BE_A_DIRECTORY, local.getAbsolutePath()));
+		client.mget("/new", local);
+	}
+	
+	@Test
+	public void testMgetLocalAlreadyExistsFile() throws IOException {
+		remoteFolder("new", "path");
+		remote("/new/path/newfile.txt", "This is new file");
+		localFolder("download", "new");
+		local("/download/new/path", "This is path file");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.LOCAL_PATH_MUST_BE_A_DIRECTORY, localGet("/download/new/path").getAbsolutePath()));
+		client.mget("/new", localGet("/download/"));
+	}
+
+	@Test
+	public void testMgetRemoteIsRoot() throws IOException {
+		File local = localFolder("a", "b", "c");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_ROOT_PATH_IS_NOT_ALLOWED);
+		client.mget("/", local);
+	}
+	
+	@Test
+	public void testMgetRemoteIsFile() throws IOException {
+		remote("hello.txt", "Hello World");
+		File local = localFolder("a", "b", "c");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY, "/hello.txt"));
+		client.mget("/hello.txt", local);
+	}
+
+	@Test
+	public void testMget() throws IOException {
+		remoteFolder("new", "a", "b", "c");
+		remote("/new/a/a.txt", "This is a file");
+		remote("/new/a/b/b.txt", "This is b file");
+		remote("/new/a/b/c/c.txt", "This is c file");
+		File local = localGet("download");
+
+		client.mget("/new", local);
+
+		assertTrue(localGet("/download/new").exists());
+		assertTrue(localGet("/download/new").isDirectory());
+
+		assertTrue(localGet("/download/new/a").exists());
+		assertTrue(localGet("/download/new/a").isDirectory());
+
+		assertTrue(localGet("/download/new/a/a.txt").exists());
+		assertEquals("This is a file", content(localGet("/download/new/a/a.txt")));
+
+		assertTrue(localGet("/download/new/a/b").exists());
+		assertTrue(localGet("/download/new/a/b").isDirectory());
+
+		assertTrue(localGet("/download/new/a/b/b.txt").exists());
+		assertEquals("This is b file", content(localGet("/download/new/a/b/b.txt")));
+
+		assertTrue(localGet("/download/new/a/b/c").exists());
+		assertTrue(localGet("/download/new/a/b/c").isDirectory());
+
+		assertTrue(localGet("/download/new/a/b/c/c.txt").exists());
+		assertEquals("This is c file", content(localGet("/download/new/a/b/c/c.txt")));
 	}
 
 	@Test
@@ -288,17 +387,18 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 
 	@Test
 	public void testPutLocalNotExists() throws IOException {
+		File local = localGet("no.txt");
 		exception.expect(IllegalArgumentException.class);
-		exception.expectMessage(RemoteClient.LOCAL_PATH_MUST_BE_EXISTS);
-		client.put(localGet("no.txt"), "/new/");
+		exception.expectMessage(String.format(RemoteClient.LOCAL_PATH_MUST_BE_EXISTS, local.getAbsolutePath()));
+		client.put(local, "/new/");
 	}
 
 	@Test
 	public void testPutLocalIsDir() throws IOException {
-		localFolder("a", "b", "c");
+		File local = localFolder("a", "b", "c");
 		exception.expect(IllegalArgumentException.class);
-		exception.expectMessage(RemoteClient.LOCAL_PATH_MUST_BE_A_FILE);
-		client.put(localGet("/a/b/c"), "/new/");
+		exception.expectMessage(String.format(RemoteClient.LOCAL_PATH_MUST_BE_A_FILE, local.getAbsolutePath()));
+		client.put(local, "/new/");
 	}
 
 	@Test
@@ -306,7 +406,7 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 		File local = local("newfile.txt", "Hello New File");
 		remote("hello.txt", "Hello World");
 		exception.expect(IllegalArgumentException.class);
-		exception.expectMessage(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY, "/hello.txt"));
 		client.put(local, "/hello.txt");
 	}
 
@@ -316,6 +416,100 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 		client.put(local, "/new/");
 		assertTrue(remoteGet("/new/newfile.txt").isFile());
 		assertEquals("Hello New File", content(remoteGet("/new/newfile.txt")));
+	}
+
+	@Test
+	public void testMputNull() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		client.mput(null, null);
+	}
+
+	@Test
+	public void testMputEmpty() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		client.mput(null, "");
+	}
+	
+	@Test
+	public void testMputBlank() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		client.mput(null, "  ");
+	}
+	
+	@Test
+	public void testMputLocalNull() throws IOException {
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(RemoteClient.LOCAL_PATH_CAN_NOT_BE_NULL);
+		client.mput(null, "/upload");
+	}
+	
+	@Test
+	public void testMputRemoteIsFile() throws IOException {
+		remote("upload", "This is upload file");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY, "/upload"));
+		client.mput(null, "/upload");
+	}
+
+	@Test
+	public void testMputRemoteAlreadyExistsFile() throws IOException {
+		localFolder("new", "path");
+		local("/new/path/newfile.txt", "This is new file");
+		remoteFolder("upload", "new");
+		remote("/upload/new/path", "This is path file");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY, "/upload/new/path"));
+		client.mput(localGet("/new"), "/upload");
+	}
+
+	@Test
+	public void testMputLocalNotExists() throws IOException {
+		File local = localGet("/new/a/b/c");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.LOCAL_PATH_MUST_BE_EXISTS, local.getAbsolutePath()));
+		client.mput(local, "/upload");
+	}
+	
+	@Test
+	public void testMputLocalIsFile() throws IOException {
+		File local = local("hello.txt", "Hello World");
+		exception.expect(IllegalArgumentException.class);
+		exception.expectMessage(String.format(RemoteClient.LOCAL_PATH_MUST_BE_A_DIRECTORY, local.getAbsolutePath()));
+		client.mput(local, "/upload");
+	}
+
+	@Test
+	public void testMput() throws IOException {
+		localFolder("new", "a", "b", "c");
+		local("/new/a/a.txt", "This is a file");
+		local("/new/a/b/b.txt", "This is b file");
+		local("/new/a/b/c/c.txt", "This is c file");
+
+		client.mput(localGet("/new"), "/upload");
+
+		assertTrue(remoteGet("/upload/new").exists());
+		assertTrue(remoteGet("/upload/new").isDirectory());
+
+		assertTrue(remoteGet("/upload/new/a").exists());
+		assertTrue(remoteGet("/upload/new/a").isDirectory());
+
+		assertTrue(remoteGet("/upload/new/a/a.txt").exists());
+		assertEquals("This is a file", content(remoteGet("/upload/new/a/a.txt")));
+
+		assertTrue(remoteGet("/upload/new/a/b").exists());
+		assertTrue(remoteGet("/upload/new/a/b").isDirectory());
+
+		assertTrue(remoteGet("/upload/new/a/b/b.txt").exists());
+		assertEquals("This is b file", content(remoteGet("/upload/new/a/b/b.txt")));
+
+		assertTrue(remoteGet("/upload/new/a/b/c").exists());
+		assertTrue(remoteGet("/upload/new/a/b/c").isDirectory());
+
+		assertTrue(remoteGet("/upload/new/a/b/c/c.txt").exists());
+		assertEquals("This is c file", content(remoteGet("/upload/new/a/b/c/c.txt")));
 	}
 
 	@Test
@@ -378,7 +572,7 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 	public void testRmRemoteIsDir() throws IOException {
 		remoteFolder("a", "b", "c");
 		exception.expect(IllegalArgumentException.class);
-		exception.expectMessage(RemoteClient.REMOTE_PATH_MUST_BE_A_FILE);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_FILE, "/a/b/c"));
 		client.rm("/a/b/c");
 	}
 
@@ -386,7 +580,7 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 	public void testRmdirRemoteIsFile() throws IOException {
 		remote("hello.txt", "Hello World");
 		exception.expect(IllegalArgumentException.class);
-		exception.expectMessage(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY);
+		exception.expectMessage(String.format(RemoteClient.REMOTE_PATH_MUST_BE_A_DIRECTORY, "/hello.txt"));
 		client.rmdir("/hello.txt");
 	}
 

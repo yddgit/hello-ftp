@@ -80,7 +80,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		assertNotNull(localFile, LOCAL_PATH_CAN_NOT_BE_NULL);
 		if(this.exists(remotePath)) {
-			assertFalse(isDir(this.stat(remotePath)), REMOTE_PATH_MUST_BE_A_FILE);
+			assertFalse(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_FILE, remotePath));
 			try (OutputStream output = new FileOutputStream(localFile)) {			
 				client.retrieveFile(remotePath, output);
 			}
@@ -95,11 +95,11 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		if(!this.exists(remotePath)) {
 			this.mkdirRecursive(remotePath);
 		} else {
-			assertTrue(isDir(this.stat(remotePath)), REMOTE_PATH_MUST_BE_A_DIRECTORY);
+			assertTrue(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_DIRECTORY, remotePath));
 		}
 		assertNotNull(localFile, LOCAL_PATH_CAN_NOT_BE_NULL);
-		assertTrue(localFile.exists(), LOCAL_PATH_MUST_BE_EXISTS);
-		assertTrue(localFile.isFile(), LOCAL_PATH_MUST_BE_A_FILE);
+		assertTrue(localFile.exists(), String.format(LOCAL_PATH_MUST_BE_EXISTS, localFile.getAbsolutePath()));
+		assertTrue(localFile.isFile(), String.format(LOCAL_PATH_MUST_BE_A_FILE, localFile.getAbsolutePath()));
 		try (InputStream input = new FileInputStream(localFile)) {
 			client.storeFile(remotePath + (remotePath.endsWith("/") ? "" : "/") + localFile.getName(), input);
 		}
@@ -110,7 +110,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
-			assertFalse(isDir(this.stat(remotePath)), REMOTE_PATH_MUST_BE_A_FILE);
+			assertFalse(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_FILE, remotePath));
 			client.deleteFile(remotePath);
 		} else {
 			logger.warn("{} does not exists", remotePath);
@@ -122,7 +122,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
-			assertTrue(isDir(this.stat(remotePath)), REMOTE_PATH_MUST_BE_A_DIRECTORY);
+			assertTrue(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_DIRECTORY, remotePath));
 			client.removeDirectory(remotePath);
 		} else {
 			logger.warn("{} does not exists", remotePath);

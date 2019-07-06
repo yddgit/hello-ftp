@@ -14,12 +14,12 @@ public abstract class RemoteClient<T> implements Closeable {
 	public static final String REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK = "remote path can not be null or blank";
 	public static final String REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED = "remote root path can not be removed";
 	public static final String REMOTE_ROOT_PATH_IS_NOT_ALLOWED = "remote root path is not allowed";
-	public static final String REMOTE_PATH_MUST_BE_A_FILE = "remote path must be a file";
-	public static final String REMOTE_PATH_MUST_BE_A_DIRECTORY = "remote path must be a directory";
+	public static final String REMOTE_PATH_MUST_BE_A_FILE = "remote path must be a file: %s";
+	public static final String REMOTE_PATH_MUST_BE_A_DIRECTORY = "remote path must be a directory: %s";
 	public static final String LOCAL_PATH_CAN_NOT_BE_NULL = "local path can not be null";
-	public static final String LOCAL_PATH_MUST_BE_EXISTS = "local path must be exists";
-	public static final String LOCAL_PATH_MUST_BE_A_FILE = "local path must be a file";
-	public static final String LOCAL_PATH_MUST_BE_A_DIRECTORY = "local path must be a directory";
+	public static final String LOCAL_PATH_MUST_BE_EXISTS = "local path must be exists: %s";
+	public static final String LOCAL_PATH_MUST_BE_A_FILE = "local path must be a file: %s";
+	public static final String LOCAL_PATH_MUST_BE_A_DIRECTORY = "local path must be a directory: %s";
 
 	public static final Logger logger = LoggerFactory.getLogger(RemoteClient.class);
 
@@ -97,12 +97,12 @@ public abstract class RemoteClient<T> implements Closeable {
 		if(!localPath.exists()) {
 			localPath.mkdirs();
 		} else {
-			assertTrue(localPath.isDirectory(), LOCAL_PATH_MUST_BE_A_DIRECTORY);
+			assertTrue(localPath.isDirectory(), String.format(LOCAL_PATH_MUST_BE_A_DIRECTORY, localPath.getAbsolutePath()));
 		}
 		remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_IS_NOT_ALLOWED);
 		if(this.exists(remotePath)) {
 			T entry = this.stat(remotePath);
-			assertTrue(isDir(entry), REMOTE_PATH_MUST_BE_A_DIRECTORY);
+			assertTrue(isDir(entry), String.format(REMOTE_PATH_MUST_BE_A_DIRECTORY, remotePath));
 			download(entry, localPath, remotePath);
 		} else {
 			logger.warn("{} does not exists", remotePath);
@@ -119,9 +119,16 @@ public abstract class RemoteClient<T> implements Closeable {
 		if(!isDir(entry)) {
 			this.get(path, new File(localPath, fileName));
 		} else {
+
+			File local = new File(localPath, fileName);
+			if(!local.exists()) {
+				local.mkdirs();
+			}
+			assertTrue(local.isDirectory(),  String.format(LOCAL_PATH_MUST_BE_A_DIRECTORY, local.getAbsolutePath()));
+
 			List<T> list = this.ls(path, false);
 			for(T e : list) {
-				download(e, new File(localPath, fileName), path + "/" + fileName);
+				download(e, local, path + (path.endsWith("/") ? "" : "/") + getFileName(e));
 			}
 		}
 	}
@@ -143,11 +150,11 @@ public abstract class RemoteClient<T> implements Closeable {
 		if(!this.exists(remotePath)) {
 			this.mkdirRecursive(remotePath);
 		} else {
-			assertTrue(isDir(this.stat(remotePath)), REMOTE_PATH_MUST_BE_A_DIRECTORY);
+			assertTrue(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_DIRECTORY, remotePath));
 		}
 		assertNotNull(localPath, LOCAL_PATH_CAN_NOT_BE_NULL);
-		assertTrue(localPath.exists(), LOCAL_PATH_MUST_BE_EXISTS);
-		assertTrue(localPath.isDirectory(), LOCAL_PATH_MUST_BE_A_DIRECTORY);
+		assertTrue(localPath.exists(), String.format(LOCAL_PATH_MUST_BE_EXISTS, localPath.getAbsolutePath()));
+		assertTrue(localPath.isDirectory(), String.format(LOCAL_PATH_MUST_BE_A_DIRECTORY, localPath.getAbsolutePath()));
 		upload(localPath, remotePath);
 	}
 
@@ -162,6 +169,7 @@ public abstract class RemoteClient<T> implements Closeable {
 		} else {
 			path = path + (path.endsWith("/") ? "" : "/") + localPath.getName();
 			this.mkdirRecursive(path);
+			assertTrue(isDir(this.stat(path)), String.format(REMOTE_PATH_MUST_BE_A_DIRECTORY, path));
 			File[] files = localPath.listFiles();
 			for(File f : files) {
 				upload(f, path);
