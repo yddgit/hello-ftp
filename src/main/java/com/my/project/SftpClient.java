@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
@@ -51,7 +52,12 @@ public class SftpClient implements RemoteClient<LsEntry> {
 
 	@Override
 	public List<LsEntry> ls(String remotePath, boolean filterHiddenFile) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+
+		if(!this.exists(remotePath)) {
+			return Collections.emptyList();
+		}
+
 		List<LsEntry> list = new ArrayList<LsEntry>();
 		LsEntrySelector selector = (entry) -> {
 			String name = entry.getFilename();
@@ -76,7 +82,7 @@ public class SftpClient implements RemoteClient<LsEntry> {
 
 	@Override
 	public void mkdir(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(!this.exists(remotePath)) {
 			try {
 				channel.mkdir(remotePath);
@@ -90,7 +96,8 @@ public class SftpClient implements RemoteClient<LsEntry> {
 
 	@Override
 	public void get(String remotePath, File local) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		assertNotNull(local, LOCAL_PATH_CAN_NOT_BE_NULL);
 		if(this.exists(remotePath)) {
 			try (OutputStream output = new FileOutputStream(local)) {			
 				channel.get(remotePath, output);
@@ -104,12 +111,13 @@ public class SftpClient implements RemoteClient<LsEntry> {
 
 	@Override
 	public void put(File local, String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(!this.exists(remotePath)) {
 			this.mkdirRecursive(remotePath);
 		}
-		assertNotNull(local, "local file can not be null");
-		assertIsTrue(local.exists(), "local file must be exists");
+		assertNotNull(local, LOCAL_PATH_CAN_NOT_BE_NULL);
+		assertIsTrue(local.exists(), LOCAL_PATH_MUST_BE_EXISTS);
+		assertIsTrue(local.isFile(), LOCAL_PATH_MUST_BE_A_FILE);
 		try (InputStream input = new FileInputStream(local)) {
 			channel.put(input, remotePath + (remotePath.endsWith("/") ? "" : "/") + local.getName(), ChannelSftp.OVERWRITE);
 		} catch (SftpException e) {
@@ -119,7 +127,7 @@ public class SftpClient implements RemoteClient<LsEntry> {
 
 	@Override
 	public void rm(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			try {
@@ -134,7 +142,7 @@ public class SftpClient implements RemoteClient<LsEntry> {
 	
 	@Override
 	public void rmdir(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			try {
@@ -149,6 +157,9 @@ public class SftpClient implements RemoteClient<LsEntry> {
 	
 	@Override
 	public boolean exists(String remotePath) {
+		if(StringUtils.isBlank(remotePath)) {
+			return false;
+		}
 		SftpATTRS attr = null;
 		try {
 			attr = channel.lstat(remotePath);
@@ -163,6 +174,9 @@ public class SftpClient implements RemoteClient<LsEntry> {
 	
 	@Override
 	public LsEntry stat(String remotePath) {
+		if(StringUtils.isBlank(remotePath)) {
+			return null;
+		}
 		try {
 			SftpATTRS attr = channel.lstat(remotePath);
 			if(attr != null) {

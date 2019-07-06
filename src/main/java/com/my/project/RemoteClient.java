@@ -11,8 +11,11 @@ import org.slf4j.LoggerFactory;
 
 public interface RemoteClient<T> extends Closeable {
 
-	public static final String REMOTE_PATH_EMPTY_MESSAGE = "remote path can not be null or blank";
+	public static final String REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK = "remote path can not be null or blank";
 	public static final String REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED = "remote root path can not be removed";
+	public static final String LOCAL_PATH_CAN_NOT_BE_NULL = "local path can not be null";
+	public static final String LOCAL_PATH_MUST_BE_EXISTS = "local path must be exists";
+	public static final String LOCAL_PATH_MUST_BE_A_FILE = "local path must be a file";
 	public static final Logger logger = LoggerFactory.getLogger("remote-client");
 
 	/**
@@ -21,7 +24,7 @@ public interface RemoteClient<T> extends Closeable {
 	 * @return 文件列表
 	 */
 	default List<T> ls(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		return this.ls(remotePath, true);
 	}
 
@@ -38,7 +41,7 @@ public interface RemoteClient<T> extends Closeable {
 	 * @param remotePath 远程目录
 	 */
 	default void mkdirRecursive(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(!this.exists(remotePath)) {
 			String prefix = "";
 			if(remotePath.startsWith("/")) {
@@ -104,7 +107,7 @@ public interface RemoteClient<T> extends Closeable {
 	 * @param remotePath 远程路径
 	 */
 	default void rmRecursive(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			T attr = this.stat(remotePath);

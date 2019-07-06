@@ -1,10 +1,16 @@
 package com.my.project;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.net.ftp.FTPFile;
 import org.apache.ftpserver.FtpServer;
 import org.apache.ftpserver.FtpServerFactory;
 import org.apache.ftpserver.ftplet.Authentication;
@@ -22,8 +28,28 @@ import org.apache.ftpserver.usermanager.impl.BaseUser;
 import org.apache.ftpserver.usermanager.impl.ConcurrentLoginPermission;
 import org.apache.ftpserver.usermanager.impl.TransferRatePermission;
 import org.apache.ftpserver.usermanager.impl.WritePermission;
+import org.junit.Test;
 
-public class FtpTest extends BaseTest<FtpServer, FtpClient> {
+public class FtpClientTest extends RemoteClientTest<FtpServer, FtpClient> {
+
+	@Test
+	public void testStat() throws IOException {
+		remote("hello.txt", "Hello World");
+		remoteFolder("a", "b", "c");
+		FTPFile f = null;
+		f = client.stat("/hello.txt");
+		assertFalse(f.isDirectory());
+		assertEquals("hello.txt", f.getName());
+		f = client.stat("/a/b/c");
+		assertTrue(f.isDirectory());
+		assertEquals("c", f.getName());
+		f = client.stat("/");
+		assertTrue(f.isDirectory());
+		assertEquals("/", f.getName());
+
+		assertNull(client.stat("/no.txt"));
+		assertNull(client.stat("/d/e/f"));
+	}
 
 	@Override
 	public void startServer() throws IOException {
@@ -35,7 +61,7 @@ public class FtpTest extends BaseTest<FtpServer, FtpClient> {
 		serverFactory.addListener("default", listener);
 		serverFactory.setUserManager(new InnerUserManager(USERNAME, PASSWORD, serverRoot.getRoot()));
 		MessageResourceFactory messageFactory = new MessageResourceFactory();
-		messageFactory.setCustomMessageDirectory(new File(FtpTest.class.getResource("/").getFile()));
+		messageFactory.setCustomMessageDirectory(new File(FtpClientTest.class.getResource("/").getFile()));
 		serverFactory.setMessageResource(messageFactory.createMessageResource());
 		this.server = serverFactory.createServer();
 		try {

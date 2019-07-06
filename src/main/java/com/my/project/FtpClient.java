@@ -13,8 +13,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
@@ -42,7 +44,12 @@ public class FtpClient implements RemoteClient<FTPFile> {
 
 	@Override
 	public List<FTPFile> ls(String remotePath, boolean filterHiddenFile) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+
+		if(!this.exists(remotePath)) {
+			return Collections.emptyList();
+		}
+
 		List<FTPFile> list = new ArrayList<FTPFile>();
 		FTPFileFilter filter = (ftpFile) -> {
 			String name = ftpFile.getName();
@@ -65,7 +72,7 @@ public class FtpClient implements RemoteClient<FTPFile> {
 
 	@Override
 	public void mkdir(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(!this.exists(remotePath)) {
 			client.makeDirectory(remotePath);
 		} else {
@@ -75,7 +82,8 @@ public class FtpClient implements RemoteClient<FTPFile> {
 
 	@Override
 	public void get(String remotePath, File local) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
+		assertNotNull(local, LOCAL_PATH_CAN_NOT_BE_NULL);
 		if(this.exists(remotePath)) {
 			try (OutputStream output = new FileOutputStream(local)) {			
 				client.retrieveFile(remotePath, output);
@@ -87,12 +95,13 @@ public class FtpClient implements RemoteClient<FTPFile> {
 
 	@Override
 	public void put(File local, String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(!this.exists(remotePath)) {
 			this.mkdirRecursive(remotePath);
 		}
-		assertNotNull(local, "local file can not be null");
-		assertIsTrue(local.exists(), "local file must be exists");
+		assertNotNull(local, LOCAL_PATH_CAN_NOT_BE_NULL);
+		assertIsTrue(local.exists(), LOCAL_PATH_MUST_BE_EXISTS);
+		assertIsTrue(local.isFile(), LOCAL_PATH_MUST_BE_A_FILE);
 		try (InputStream input = new FileInputStream(local)) {
 			client.storeFile(remotePath + (remotePath.endsWith("/") ? "" : "/") + local.getName(), input);
 		}
@@ -100,7 +109,7 @@ public class FtpClient implements RemoteClient<FTPFile> {
 	
 	@Override
 	public void rm(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			client.deleteFile(remotePath);
@@ -111,7 +120,7 @@ public class FtpClient implements RemoteClient<FTPFile> {
 	
 	@Override
 	public void rmdir(String remotePath) throws IOException {
-		assertNotBlank(remotePath, REMOTE_PATH_EMPTY_MESSAGE);
+		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			client.removeDirectory(remotePath);
@@ -122,6 +131,9 @@ public class FtpClient implements RemoteClient<FTPFile> {
 
 	@Override
 	public boolean exists(String remotePath) {
+		if(StringUtils.isBlank(remotePath)) {
+			return false;
+		}
 		try {
 			client.getStatus(remotePath);
 			return FTPReply.isPositiveCompletion(client.getReplyCode());
@@ -133,6 +145,9 @@ public class FtpClient implements RemoteClient<FTPFile> {
 
 	@Override
 	public FTPFile stat(String remotePath) {
+		if(StringUtils.isBlank(remotePath)) {
+			return null;
+		}
 		try {
 			return client.mlistFile(remotePath);
 		} catch (IOException e) {
