@@ -1,3 +1,0 @@
-# https://tools.ietf.org/html/rfc3659#page-24
-# Note that for MLST the fact set is preceded by a space.
-250.MLST=\n {output.msg}\nRequested file action okay, completed.

@@ -12,18 +12,21 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.net.MalformedServerReplyException;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
+import org.apache.commons.net.ftp.FTPCmd;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPFileFilter;
 import org.apache.commons.net.ftp.FTPReply;
+import org.apache.commons.net.ftp.parser.MLSxEntryParser;
 
 public class FtpClient extends RemoteClient<FTPFile> {
 
 	private FTPClient client;
 
 	public FtpClient(String hostname, Integer port, String username, String password, int timeout) throws SocketException, IOException {
-		this.client = new FTPClient();
+		this.client = new InnerFtpClient();
 		this.client.setListHiddenFiles(true);
 		this.client.setConnectTimeout(timeout);
 		this.client.setDataTimeout(timeout);
@@ -172,6 +175,35 @@ public class FtpClient extends RemoteClient<FTPFile> {
 			client.disconnect();
 			client = null;
 		}
+	}
+
+	/**
+	 * Fix MLST command error
+	 * 
+	 * https://tools.ietf.org/html/rfc3659#page-24
+	 * Note that for MLST the fact set is preceded by a space.
+	 */
+	private static class InnerFtpClient extends FTPClient {
+		@Override
+		public FTPFile mlistFile(String pathname) throws IOException {
+			boolean success = FTPReply.isPositiveCompletion(sendCommand(FTPCmd.MLST, pathname));
+			if (success) {
+				String reply = getReplyStrings()[1];
+				// some FTP server reply not contains space before fact(s)
+				if(reply.charAt(0) != ' ') { reply = " " + reply; }
+				/*
+				 * check the response makes sense. Must have space before fact(s) and between
+				 * fact(s) and filename Fact(s) can be absent, so at least 3 chars are needed.
+				 */
+				if (reply.length() < 3 || reply.charAt(0) != ' ') {
+					throw new MalformedServerReplyException("Invalid server reply (MLST): '" + reply + "'");
+				}
+				String entry = reply.substring(1); // skip leading space for parser
+				return MLSxEntryParser.parseEntry(entry);
+			} else {
+				return null;
+			}
+	    }
 	}
 
 }
