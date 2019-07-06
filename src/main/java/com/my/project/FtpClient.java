@@ -25,6 +25,9 @@ public class FtpClient extends RemoteClient<FTPFile> {
 	public FtpClient(String hostname, Integer port, String username, String password, int timeout) throws SocketException, IOException {
 		this.client = new FTPClient();
 		this.client.setListHiddenFiles(true);
+		this.client.setConnectTimeout(timeout);
+		this.client.setDataTimeout(timeout);
+		this.client.setDefaultTimeout(timeout);
 		this.client.connect(hostname, port);
 		this.client.login(username, password);
 		this.client.setFileType(FTP.BINARY_FILE_TYPE);
@@ -32,9 +35,6 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		this.client.setUseEPSVwithIPv4(true);
 		this.client.enterLocalPassiveMode();
 		this.client.changeWorkingDirectory("/");
-		this.client.setConnectTimeout(timeout);
-		this.client.setDataTimeout(timeout);
-		this.client.setDefaultTimeout(timeout);
 	}
 
 	@Override
