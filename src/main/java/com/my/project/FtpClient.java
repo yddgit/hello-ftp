@@ -35,7 +35,6 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		this.client.login(username, password);
 		this.client.setFileType(FTP.BINARY_FILE_TYPE);
 		this.client.setBufferSize(100 * 1024);
-		this.client.setUseEPSVwithIPv4(true);
 		this.client.enterLocalPassiveMode();
 		this.client.changeWorkingDirectory("/");
 	}
