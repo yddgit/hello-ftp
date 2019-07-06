@@ -28,6 +28,8 @@ public abstract class RemoteClientTest<S, C extends RemoteClient<?>> extends Bas
 	public static final String PASSWORD = "password";
 	/** FTP/SFTP主机名 */
 	public static final String HOSTNAME = "localhost";
+	/** 连接超时时间(milliseconds) */
+	public static final int TIMEOUT = 60 * 1000;
 
 	private final TestAppender loggerAppender = new TestAppender();
 

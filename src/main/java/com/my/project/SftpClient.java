@@ -34,14 +34,14 @@ public class SftpClient implements RemoteClient<LsEntry> {
 	private Session session;
 	private ChannelSftp channel;
 
-	public SftpClient(String hostname, Integer port, String username, String password) throws JSchException, SftpException {
+	public SftpClient(String hostname, Integer port, String username, String password, int timeout) throws JSchException, SftpException {
 		JSch jsch = new JSch();
 		this.session = jsch.getSession(username, hostname, port);
 		this.session.setConfig("StrictHostKeyChecking", "no");
 		InnerUserInfo userInfo = () -> password;
 		this.session.setUserInfo(userInfo);
 		this.session.setPassword(password);
-		this.session.setTimeout(2 * 60 * 60 * 1000);
+		this.session.setTimeout(timeout);
 		this.session.connect();
 		
 		Channel channel = this.session.openChannel("sftp");

@@ -70,7 +70,7 @@ public class FtpClientTest extends RemoteClientTest<FtpServer, FtpClient> {
 			throw new IOException(e);
 		}
 		this.localPort = listener.getPort();
-		this.client = new FtpClient(HOSTNAME, this.localPort, USERNAME, PASSWORD);
+		this.client = new FtpClient(HOSTNAME, this.localPort, USERNAME, PASSWORD, TIMEOUT);
 	}
 
 	@Override

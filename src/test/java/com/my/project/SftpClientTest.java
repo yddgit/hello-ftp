@@ -68,7 +68,7 @@ public class SftpClientTest extends RemoteClientTest<SshServer, SftpClient> {
 		this.server.start();
 		this.localPort = this.server.getPort();
 		try {
-			this.client = new SftpClient(HOSTNAME, this.localPort, USERNAME, PASSWORD);
+			this.client = new SftpClient(HOSTNAME, this.localPort, USERNAME, PASSWORD, TIMEOUT);
 		} catch (JSchException | SftpException e) {
 			throw new IOException(e);
 		}

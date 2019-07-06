@@ -16,7 +16,7 @@ public interface RemoteClient<T> extends Closeable {
 	public static final String LOCAL_PATH_CAN_NOT_BE_NULL = "local path can not be null";
 	public static final String LOCAL_PATH_MUST_BE_EXISTS = "local path must be exists";
 	public static final String LOCAL_PATH_MUST_BE_A_FILE = "local path must be a file";
-	public static final Logger logger = LoggerFactory.getLogger("remote-client");
+	public static final Logger logger = LoggerFactory.getLogger(RemoteClient.class);
 
 	/**
 	 * 列出指定目录下的文件
