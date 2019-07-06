@@ -138,8 +138,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 			return false;
 		}
 		try {
-			client.getStatus(remotePath);
-			return FTPReply.isPositiveCompletion(client.getReplyCode());
+			return client.mlistFile(remotePath) != null;
 		} catch (IOException e) {
 			logger.warn(e.getMessage());
 			return false;
