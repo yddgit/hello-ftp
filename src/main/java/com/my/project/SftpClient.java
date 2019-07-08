@@ -19,6 +19,7 @@ import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.ChannelSftp.LsEntrySelector;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.ProxySOCKS5;
 import com.jcraft.jsch.Session;
 import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
@@ -29,7 +30,17 @@ public class SftpClient extends RemoteClient<LsEntry> {
 	private Session session;
 	private ChannelSftp channel;
 
-	public SftpClient(String hostname, Integer port, String username, String password, int timeout) throws JSchException, SftpException {
+	/**
+	 * 创建一个SFTP连接
+	 * @param hostname SFTP主机
+	 * @param port SFTP端口
+	 * @param username SFTP用户名
+	 * @param password SFTP用户密码
+	 * @param timeout 连接超时时间(ms)
+	 * @param proxyHost SOCK5代理主机
+	 * @param proxyPort SOCK5代理端口
+	 */
+	public SftpClient(String hostname, Integer port, String username, String password, int timeout, String proxyHost, Integer proxyPort) throws JSchException, SftpException {
 		JSch jsch = new JSch();
 		this.session = jsch.getSession(username, hostname, port);
 		this.session.setConfig("StrictHostKeyChecking", "no");
@@ -37,6 +48,9 @@ public class SftpClient extends RemoteClient<LsEntry> {
 		this.session.setUserInfo(userInfo);
 		this.session.setPassword(password);
 		this.session.setTimeout(timeout);
+		if(StringUtils.isNotBlank(proxyHost) && isValidTCPPort(proxyPort)) {
+			this.session.setProxy(new ProxySOCKS5(proxyHost, proxyPort));
+		}
 		this.session.connect();
 		
 		Channel channel = this.session.openChannel("sftp");

@@ -314,4 +314,15 @@ public abstract class RemoteClient<T> implements Closeable {
 		return remotePath;
 	}
 
+	/**
+	 * 是否为合法的TCP端口
+	 * @param port 端口
+	 * @return port合法则返回true，否则返回false
+	 */
+	public static boolean isValidTCPPort(Integer port) {
+		if(port == null || port <= 0 || port > 65535) {
+			return false;
+		}
+		return true;
+	}
 }

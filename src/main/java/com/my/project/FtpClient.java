@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,12 +27,25 @@ public class FtpClient extends RemoteClient<FTPFile> {
 
 	private FTPClient client;
 
-	public FtpClient(String hostname, Integer port, String username, String password, int timeout) throws SocketException, IOException {
+	/**
+	 * 创建一个FTP连接
+	 * @param hostname FTP主机
+	 * @param port FTP端口
+	 * @param username FTP用户名
+	 * @param password FTP用户密码
+	 * @param timeout 连接超时时间(ms)
+	 * @param proxyHost SOCK5代理主机
+	 * @param proxyPort SOCK5代理端口
+	 */
+	public FtpClient(String hostname, Integer port, String username, String password, int timeout, String proxyHost, Integer proxyPort) throws SocketException, IOException {
 		this.client = new InnerFtpClient();
 		this.client.setListHiddenFiles(true);
 		this.client.setConnectTimeout(timeout);
 		this.client.setDataTimeout(timeout);
 		this.client.setDefaultTimeout(timeout);
+		if(StringUtils.isNotBlank(proxyHost) && isValidTCPPort(proxyPort)) {
+			this.client.setProxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(proxyHost, proxyPort)));
+		}
 		this.client.connect(hostname, port);
 		this.client.login(username, password);
 		this.client.setFileType(FTP.BINARY_FILE_TYPE);
