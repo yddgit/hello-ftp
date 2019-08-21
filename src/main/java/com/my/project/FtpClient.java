@@ -148,11 +148,8 @@ public class FtpClient extends RemoteClient<FTPFile> {
 
 	@Override
 	public boolean exists(String remotePath) {
-		if(StringUtils.isBlank(remotePath)) {
-			return false;
-		}
 		try {
-			return client.mlistFile(remotePath) != null;
+			return this.getFTPFile(remotePath) != null;
 		} catch (IOException e) {
 			logger.warn(e.getMessage());
 			return false;
@@ -161,11 +158,8 @@ public class FtpClient extends RemoteClient<FTPFile> {
 
 	@Override
 	public FTPFile stat(String remotePath) {
-		if(StringUtils.isBlank(remotePath)) {
-			return null;
-		}
 		try {
-			return client.mlistFile(remotePath);
+			return this.getFTPFile(remotePath);
 		} catch (IOException e) {
 			logger.warn(e.getMessage());
 		}
@@ -187,6 +181,40 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		if(client != null) {
 			client.disconnect();
 			client = null;
+		}
+	}
+
+	private FTPFile getFTPFile(String remotePath) throws IOException {
+		if(StringUtils.isBlank(remotePath)) {
+			return null;
+		}
+		if (client.hasFeature(FTPCmd.MLST.name())) {
+			return client.mlistFile(remotePath);
+		} else {
+			remotePath = remotePath.trim();
+			if (remotePath.endsWith("/")) {
+				remotePath = remotePath.substring(0, remotePath.length() - 1);
+			}
+			if (StringUtils.isBlank(remotePath)) {
+				FTPFile[] files = client.listFiles("/", ftpFile -> {
+					if(ftpFile != null && ".".equals(ftpFile.getName())) {
+						ftpFile.setName("/");
+						return true;
+					}
+					return false;
+				});
+				return (files != null && files.length > 0) ? files[0] : null;
+			}
+			String parent = remotePath.substring(0, remotePath.lastIndexOf("/"));
+			parent = StringUtils.isBlank(parent) ? "/" : parent;
+			String name = remotePath.substring(remotePath.lastIndexOf("/") + 1);
+			FTPFile[] files = client.listFiles(parent, ftpFile -> {
+				if(ftpFile != null && ftpFile.getName().equals(name)) {
+					return true;
+				}
+				return false;
+			});
+			return (files != null && files.length > 0) ? files[0] : null;
 		}
 	}
 
