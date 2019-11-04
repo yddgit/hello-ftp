@@ -239,7 +239,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 				if (reply.length() < 3 || reply.charAt(0) != ' ') {
 					throw new MalformedServerReplyException("Invalid server reply (MLST): '" + reply + "'");
 				}
-				String entry = reply.substring(1); // skip leading space for parser
+				String entry = reply.substring(1).replaceAll("^\\s+", ""); // skip leading space for parser
 				return MLSxEntryParser.parseEntry(entry);
 			} else {
 				return null;
