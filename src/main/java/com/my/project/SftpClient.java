@@ -7,9 +7,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -29,6 +31,7 @@ public class SftpClient extends RemoteClient<LsEntry> {
 
 	private Session session;
 	private ChannelSftp channel;
+	private File privateKeyFile;
 
 	/**
 	 * 创建一个SFTP连接
@@ -40,10 +43,16 @@ public class SftpClient extends RemoteClient<LsEntry> {
 	 * @param proxyHost SOCK5代理主机
 	 * @param proxyPort SOCK5代理端口
 	 */
-	public SftpClient(String hostname, Integer port, String username, String password, int timeout, String proxyHost, Integer proxyPort) throws JSchException, SftpException {
+	public SftpClient(String hostname, Integer port, String username, String password, String privateKey, String passphrase, int timeout, String proxyHost, Integer proxyPort) throws JSchException, SftpException, IOException {
 		JSch jsch = new JSch();
+		if(StringUtils.isNotBlank(privateKey)) {
+			privateKeyFile = new File(System.getProperty("java.io.tmpdir") + File.separator + UUID.randomUUID().toString() + ".key");
+			Files.write(privateKeyFile.toPath(), privateKey.getBytes());
+			jsch.addIdentity(privateKeyFile.getCanonicalPath(), passphrase);
+		}
 		this.session = jsch.getSession(username, hostname, port);
 		this.session.setConfig("StrictHostKeyChecking", "no");
+		this.session.setConfig("PreferredAuthentications", "publickey,password,keyboard-interactive");
 		InnerUserInfo userInfo = () -> password;
 		this.session.setUserInfo(userInfo);
 		this.session.setPassword(password);
@@ -262,6 +271,9 @@ public class SftpClient extends RemoteClient<LsEntry> {
 		if(session != null) {
 			session.disconnect();
 			session = null;
+		}
+		if(privateKeyFile != null && privateKeyFile.exists()) {
+			privateKeyFile.delete();
 		}
 	}
 
