@@ -3,11 +3,12 @@ package com.my.project;
 import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.SftpException;
 
+import java.io.File;
 import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws IOException, SftpException, JSchException {
-        if(args == null || args.length < 6) {
+        if(args == null || args.length < 7) {
             System.out.println("Usage: java -jar ftp.jar" +
                     " --type=FTP" +
                     " --host=example.com" +
@@ -15,6 +16,7 @@ public class Main {
                     " --user=user1" +
                     " --pass=user1pass" +
                     " --remotePath=/" +
+                    " --op=ls" +
                     " --proxy=example.proxy.com" +
                     " --proxyPort=8080");
             return;
@@ -26,8 +28,9 @@ public class Main {
         String user = args[3].replace("--user=", "");
         String pass = args[4].replace("--pass=", "");
         String remotePath = args[5].replace("--remotePath=", "");
-        String proxy = args.length >= 8 ? args[6].replace("--proxy=", "") : null;
-        Integer proxyPort = args.length >= 8 ? Integer.parseInt(args[7].replace("--proxyPort=", "")) : null;
+        String op = args[6].replace("--op=", "");
+        String proxy = args.length >= 8 ? args[7].replace("--proxy=", "") : null;
+        Integer proxyPort = args.length >= 8 ? Integer.parseInt(args[8].replace("--proxyPort=", "")) : null;
 
         RemoteClient client = null;
         if("FTP".equals(type.toUpperCase())) {
@@ -37,8 +40,13 @@ public class Main {
         }
 
         if(client != null) {
-            for (Object o : client.ls(remotePath)) {
-                System.out.println(o);
+            if("ls".equals(op)) {
+                for (Object o : client.ls(remotePath)) {
+                    System.out.println(o);
+                }
+            }
+            if("download".equals(op)) {
+                client.mget(remotePath, new File("download-test"));
             }
             client.close();
         }
