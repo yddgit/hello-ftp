@@ -47,7 +47,11 @@ public class FtpClient extends RemoteClient<FTPFile> {
 			this.client.setProxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(proxyHost, proxyPort)));
 		}
 		this.client.connect(hostname, port);
-		this.client.login(username, password);
+		if(!this.client.login(username, password)) {
+			String response = this.client.getReplyString();
+			this.client.logout();
+			throw new IOException(response);
+		}
 		this.client.setFileType(FTP.BINARY_FILE_TYPE);
 		this.client.setBufferSize(100 * 1024);
 		this.client.enterLocalPassiveMode();
