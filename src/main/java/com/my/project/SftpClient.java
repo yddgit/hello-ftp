@@ -263,6 +263,12 @@ public class SftpClient extends RemoteClient<LsEntry> {
 	}
 
 	@Override
+	public long getModificationTime(LsEntry entry) {
+		// getMTime() method return seconds, but we need return milliseconds
+		return entry != null ? entry.getAttrs().getMTime() * 1000 : 0;
+	}
+
+	@Override
 	public void close() {
 		if(channel != null) {
 			channel.disconnect();

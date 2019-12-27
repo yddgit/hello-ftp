@@ -258,6 +258,13 @@ public abstract class RemoteClient<T> implements Closeable {
 	public abstract String getFileName(T entry);
 
 	/**
+	 * 获取文件最近修改时间
+	 * @param entry 指定文件
+	 * @return 上次修改时间对应的timestamp
+	 */
+	public abstract long getModificationTime(T entry);
+
+	/**
 	 * 检查指定对象不能为空
 	 * @param object 要检查的对象
 	 * @param message 异常message

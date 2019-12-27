@@ -47,15 +47,11 @@ public class FtpClient extends RemoteClient<FTPFile> {
 			this.client.setProxy(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(proxyHost, proxyPort)));
 		}
 		this.client.connect(hostname, port);
-		if(!this.client.login(username, password)) {
-			String response = this.client.getReplyString();
-			this.client.logout();
-			throw new IOException(response);
-		}
-		this.client.setFileType(FTP.BINARY_FILE_TYPE);
+		exec(() -> this.client.login(username, password));
+		exec(() -> this.client.setFileType(FTP.BINARY_FILE_TYPE));
 		this.client.setBufferSize(100 * 1024);
 		this.client.enterLocalPassiveMode();
-		this.client.changeWorkingDirectory("/");
+		exec(() -> this.client.changeWorkingDirectory("/"));
 	}
 
 	@Override
@@ -90,7 +86,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 	public void mkdir(String remotePath) throws IOException {
 		assertNotBlank(remotePath, REMOTE_PATH_CAN_NOT_BE_NULL_OR_BLANK);
 		if(!this.exists(remotePath)) {
-			client.makeDirectory(remotePath);
+			exec(() -> client.makeDirectory(remotePath));
 		} else {
 			logger.warn("{} already exists", remotePath);
 		}
@@ -102,8 +98,8 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		assertNotNull(localFile, LOCAL_PATH_CAN_NOT_BE_NULL);
 		if(this.exists(remotePath)) {
 			assertFalse(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_FILE, remotePath));
-			try (OutputStream output = new FileOutputStream(localFile)) {			
-				client.retrieveFile(remotePath, output);
+			try (OutputStream output = new FileOutputStream(localFile)) {
+				exec(() -> client.retrieveFile(remotePath, output));
 			}
 		} else {
 			logger.warn("{} does not exists", remotePath);
@@ -122,7 +118,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		assertTrue(localFile.exists(), String.format(LOCAL_PATH_MUST_BE_EXISTS, localFile.getAbsolutePath()));
 		assertTrue(localFile.isFile(), String.format(LOCAL_PATH_MUST_BE_A_FILE, localFile.getAbsolutePath()));
 		try (InputStream input = new FileInputStream(localFile)) {
-			client.storeFile(remotePath + (remotePath.endsWith("/") ? "" : "/") + localFile.getName(), input);
+			exec(() -> client.storeFile(remotePath + (remotePath.endsWith("/") ? "" : "/") + localFile.getName(), input));
 		}
 	}
 	
@@ -132,7 +128,8 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			assertFalse(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_FILE, remotePath));
-			client.deleteFile(remotePath);
+			final String finalRemotePath = remotePath;
+			exec(() -> client.deleteFile(finalRemotePath));
 		} else {
 			logger.warn("{} does not exists", remotePath);
 		}
@@ -144,7 +141,8 @@ public class FtpClient extends RemoteClient<FTPFile> {
 		if(this.exists(remotePath)) {
 			remotePath = assertRemotePathIsNotRoot(remotePath, REMOTE_ROOT_PATH_CAN_NOT_BE_REMOVED);
 			assertTrue(isDir(this.stat(remotePath)), String.format(REMOTE_PATH_MUST_BE_A_DIRECTORY, remotePath));
-			client.removeDirectory(remotePath);
+			final String finalRemotePath = remotePath;
+			exec(() -> client.removeDirectory(finalRemotePath));
 		} else {
 			logger.warn("{} does not exists", remotePath);
 		}
@@ -178,6 +176,11 @@ public class FtpClient extends RemoteClient<FTPFile> {
 	@Override
 	public String getFileName(FTPFile entry) {
 		return entry != null ? entry.getName() : null;
+	}
+
+	@Override
+	public long getModificationTime(FTPFile entry) {
+		return entry != null ? entry.getTimestamp().getTime().getTime() : 0;
 	}
 
 	@Override
@@ -221,6 +224,23 @@ public class FtpClient extends RemoteClient<FTPFile> {
 			return (files != null && files.length > 0) ? files[0] : null;
 		}
 	}
+
+	/**
+	 * 执行FTP命令，如果返回值为false，则抛出异常
+	 * @param cmd
+	 * @throws IOException
+	 */
+	private void exec(FtpCommand cmd) throws IOException {
+		boolean success = cmd.exec();
+		if(!success) {
+			String response = this.client.getReplyString();
+			this.client.logout();
+			throw new IOException(response);
+		}
+	}
+
+	@FunctionalInterface
+	private interface FtpCommand { boolean exec() throws IOException; }
 
 	/**
 	 * Fix MLST command error
