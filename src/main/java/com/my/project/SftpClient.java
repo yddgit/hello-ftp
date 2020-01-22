@@ -7,6 +7,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,10 +25,10 @@ import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.ChannelSftp.LsEntrySelector;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
-import com.jcraft.jsch.ProxySOCKS5;
 import com.jcraft.jsch.Session;
 import com.jcraft.jsch.SftpATTRS;
 import com.jcraft.jsch.SftpException;
+import com.jcraft.jsch.SocketFactory;
 import com.jcraft.jsch.UserInfo;
 
 public class SftpClient extends RemoteClient<LsEntry> {
@@ -58,7 +62,22 @@ public class SftpClient extends RemoteClient<LsEntry> {
 		this.session.setPassword(password);
 		this.session.setTimeout(timeout);
 		if(StringUtils.isNotBlank(proxyHost) && isValidTCPPort(proxyPort)) {
-			this.session.setProxy(new ProxySOCKS5(proxyHost, proxyPort));
+			this.session.setSocketFactory(new SocketFactory() {
+				@Override
+				public Socket createSocket(String host, int port) throws IOException, UnknownHostException {
+					Socket socket = new Socket(new Proxy(Proxy.Type.SOCKS, new InetSocketAddress(proxyHost, proxyPort)));
+					socket.connect(new InetSocketAddress(host, port), timeout);
+					return socket;
+				}
+				@Override
+				public InputStream getInputStream(Socket socket) throws IOException {
+					return socket.getInputStream();
+				}
+				@Override
+				public OutputStream getOutputStream(Socket socket) throws IOException {
+					return socket.getOutputStream();
+				}
+			});
 		}
 		this.session.connect();
 		
