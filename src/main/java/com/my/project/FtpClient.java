@@ -180,7 +180,7 @@ public class FtpClient extends RemoteClient<FTPFile> {
 
 	@Override
 	public long getModificationTime(FTPFile entry) {
-		return entry != null ? entry.getTimestamp().getTime().getTime() : 0;
+		return entry != null ? entry.getTimestamp().getTime().getTime() : 0L;
 	}
 
 	@Override
