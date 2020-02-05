@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -226,12 +227,13 @@ public class SftpClient extends RemoteClient<LsEntry> {
 				if(!attr.isDir()) {
 					entry.add(this.ls(remotePath, false).get(0));
 				} else {
+					String filename = getFileNameFromRemotePath(remotePath);
 					channel.ls(remotePath, (e) -> {
 						if(".".equals(e.getFilename())) {
 							try {
 								Method setFilename = LsEntry.class.getDeclaredMethod("setFilename", String.class);
 								setFilename.setAccessible(true);
-								setFilename.invoke(e, getFileNameFromRemotePath(remotePath));
+								setFilename.invoke(e, filename);
 							} catch (Exception ex) {
 								logger.warn(ex.getMessage());
 							}
@@ -241,12 +243,19 @@ public class SftpClient extends RemoteClient<LsEntry> {
 							return LsEntrySelector.CONTINUE;
 						}
 					});
+					if(entry.isEmpty()) {
+						Constructor<LsEntry> constructor = LsEntry.class.getDeclaredConstructor(ChannelSftp.class, String.class, String.class, SftpATTRS.class);
+						constructor.setAccessible(true);
+						String longname = attr.toString() + " " + filename;
+						LsEntry e = constructor.newInstance(channel, filename, longname, attr);
+						entry.add(e);
+					}
 				}
 				if(entry.size() > 0) {
 					return entry.get(0);
 				}
 			}
-		} catch (SftpException | IOException e) {
+		} catch (Exception e) {
 			logger.warn(e.getMessage());
 		}
 		return null;
